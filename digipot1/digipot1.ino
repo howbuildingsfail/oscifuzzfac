@@ -17,9 +17,7 @@ Oscil <2048, CONTROL_RATE> gateSin(SIN2048_DATA);
 Oscil <2048, CONTROL_RATE> distSin(SIN2048_DATA);
 Oscil <2048, CONTROL_RATE> stabSin(SIN2048_DATA);
 
-
 float depth=0.25;
-
 
 /*********************************************************************************/
 /* MIDI - from jamjar drumkit ****************************************************/
@@ -166,7 +164,7 @@ void setup() {
 }
 
 
-int lfo1,lfo2,lfo3,lfo4;
+int compLFO,distLFO,gateLFO,stabLFO;
 
 void updateControl(){
 
@@ -175,19 +173,19 @@ void updateControl(){
 
   //TODO: The following should be in the MIDI control commands
   // compSin.next() returns a signed byte between -128 to 127 from the wave table
-  lfo1 = 128 + (0.9 * compSin.next());
-  lfo2 = 128 + (0.9 * gateSin.next());
-  lfo3 = 128 + (0.9 * distSin.next());
-  lfo4 = 128 + (0.9 * stabSin.next());
+  compLFO = 128 + (0.9 * compSin.next());
+  distLFO = 128 + (0.9 * gateSin.next());
+  gateLFO = 128 + (0.9 * distSin.next());
+  stabLFO = 128 + (0.9 * stabSin.next());
 
 
-  //spi_out(CS_signal, cmd_byteboth, lfo1); 
-  spi_out(aCS_signal, cmd_byte0, lfo1,  aMOSI_signal, aCLK_signal); 
-  spi_out(aCS_signal, cmd_byte1, lfo2,  aMOSI_signal, aCLK_signal); 
-  spi_out(bCS_signal, cmd_byte0, lfo3,  bMOSI_signal, bCLK_signal); 
-  spi_out(bCS_signal, cmd_byte1, lfo4,  bMOSI_signal, bCLK_signal); 
+  //spi_out(CS_signal, cmd_byteboth, compLFO); 
+  spi_out(aCS_signal, cmd_byte0, compLFO,  aMOSI_signal, aCLK_signal); 
+  spi_out(aCS_signal, cmd_byte1, distLFO,  aMOSI_signal, aCLK_signal); 
+  spi_out(bCS_signal, cmd_byte0, gateLFO,  bMOSI_signal, bCLK_signal); 
+  spi_out(bCS_signal, cmd_byte1, stabLFO,  bMOSI_signal, bCLK_signal); 
 
-  analogWrite(LED_gate, lfo2);
+  analogWrite(LED_gate, distLFO);
   
 }
 

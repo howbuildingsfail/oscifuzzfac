@@ -5,25 +5,26 @@
 /*********************************************************************************/
 
 
-/* On Arduino we can use analogwrite on pins 3, 5, 6, 9, 10, and 11. 
- *  /
- *
+/* On Arduino we can usually use analogwrite on pins 3, 5, 6, 9, 10, and 11. 
 
- Suggest we avoid pins that Mozzi uses where possible for spi - then test the LED pins one at a time
- 
- 
- 
+  However, mozzi manipulates the timers, which means this isn't the case:
+  instead, there's a bitbanging trick which works - see updateLED function
+
+  We've put the SPI connections on the analog side, and the LED on the digital side
+  
  */
 
 
 
 
 //TODO: we could #define these!
-byte aCS_signal   = A4;//5;//2;                      // Chip Select signal on pin 5 of Arduino
-byte aCLK_signal  = A5;//6;//4;                     // Clock signal on pin 6 of Arduino
-byte aMOSI_signal = A6;//7;//5;                    // MOSI signal on pin 7 of Arduino
+//This is the chip NEAREST TO the Arduino
+//NB We were having trouble with using the analog pins - not sure why
+byte aCS_signal   = 8;//A4;//5;//2;                      // Chip Select signal on pin 5 of Arduino
+byte aCLK_signal  = 12;//A5;//6;//4;                     // Clock signal on pin 6 of Arduino
+byte aMOSI_signal = 13;//A6;//7;//5;                    // MOSI signal on pin 7 of Arduino
 
-
+//This is the chip FURTHEST FROM the Arduino
 byte bCS_signal   = A0;//2;                      // Chip Select signal on pin 5 of Arduino
 byte bCLK_signal  = A1;//3;                     // Clock signal on pin 6 of Arduino
 byte bMOSI_signal = A2;//4;                    // MOSI signal on pin 7 of Arduino
@@ -32,12 +33,34 @@ byte bMOSI_signal = A2;//4;                    // MOSI signal on pin 7 of Arduin
 //*Mozzi disables analogWrite() on pins 5 and 6 (Timer 0), 9 and 10 (Timer 1) in STANDARD mode. In HIFI mode, pins 3 and 11 (Timer 2) are also out. Pin numbers vary between boards.
 //PIN 9 DOESN'T SEEM TO WOIK!work
 //PIN 5 and 6 don't seem to 
-#define LED_comp 11     //output flashing LED in time with the LFO rate for GATE pot
-#define LED_dist 3      //output flashing LED in time with the LFO rate for GATE pot
-#define LED_gate 10     //output flashing LED in time with the LFO rate for GATE pot
-#define LED_stab 6    
+#define LED_COMP_PIN 4     //output flashing LED in time with the LFO rate for GATE pot
+#define LED_DIST_PIN 3      //output flashing LED in time with the LFO rate for GATE pot
+#define LED_GATE_PIN 2//10     //output flashing LED in time with the LFO rate for GATE pot
+#define LED_STAB_PIN 6    // trying to bitbang this ..
 
 
+/*********************************************************************************/
+/*  GLOBAL VARIABLES  ************************************************************/
+/*********************************************************************************/
+
+//LFO values
+byte compVal,distVal,gateVal,stabVal;
+
+//Boolean to say whether we are oscillating or not
+bool  OSCcomp = true,
+      OSCdist = true,
+      OSCgate = true,
+      OSCstab = true;
+
+
+//TODO: we could #define these!
+byte cmd_byte1    = B00010010 ;            // Command byte
+byte cmd_byte0    = B00010001 ;            // Command byte
+byte cmd_byteboth = B00010011 ;            // Command byte
+
+
+//TODO: set initial value better - perhaps use the default...? 
+int initial_value = 100;                // Setting up the initial value
 
 /*********************************************************************************/
 /*  http://sensorium.github.io/Mozzi/learn/a-simple-sketch/  *********************/
@@ -50,15 +73,71 @@ byte bMOSI_signal = A2;//4;                    // MOSI signal on pin 7 of Arduin
 
 #define CONTROL_RATE (128)
 
+//LFO oscillators: 
 Oscil <2048, CONTROL_RATE> compSin(SIN2048_DATA);
-//Sketch uses 10,100 bytes (32%) of program storage space. Maximum is 30,720 bytes.
-//Global variables use 1,009 bytes (49%) of dynamic memory, leaving 1,039 bytes for local variables. Maximum is 2,048 bytes.
-
 Oscil <2048, CONTROL_RATE> gateSin(SIN2048_DATA);
 Oscil <2048, CONTROL_RATE> distSin(SIN2048_DATA);
 Oscil <2048, CONTROL_RATE> stabSin(SIN2048_DATA);
 
-float depth=0.25;
+/*********************************************************************************/
+/* LED brightness - using bitbanging *********************************************/
+/*********************************************************************************/
+
+
+/* https://github.com/sensorium/Mozzi/blob/master/examples/11.Communication/Sinewave_PWM_leds_HIFI/Sinewave_PWM_leds_HIFI.ino
+ * 
+void updateRGB(byte r, byte g, byte b){
+  // stagger pwm counter starts to try to reduce combined flicker
+  static byte red_count=0;
+  static byte green_count=85;
+  static byte blue_count=170;
+// PORTD maps to Arduino digital pins 0 to 7
+// http://playground.arduino.cc/Learning/PortManipulation
+  (red_count++ >= r) ? PORTD &= ~(1 << RED_PIN) : PORTD |= (1 << RED_PIN);
+  (green_count++ >= g) ? PORTD &= ~(1 << GREEN_PIN) : PORTD |= (1 << GREEN_PIN);
+  (blue_count++ >= b) ? PORTD &= ~(1 << BLUE_PIN) : PORTD |= (1 << BLUE_PIN);
+}
+*/
+
+
+void updateLED(byte PIN, byte r){
+  // stagger pwm counter starts to try to reduce combined flicker
+  static byte red_count=0;
+  
+  //static byte green_count=85;
+  //static byte blue_count=170;
+  
+  // PORTD maps to Arduino digital pins 0 to 7
+  // http://playground.arduino.cc/Learning/PortManipulation
+
+  (red_count++ >= r) ? PORTD &= ~(1 << PIN) : PORTD |= (1 << PIN);
+}
+
+
+/*********************************************************************************/
+/* Generic setting functions  ****************************************************/
+/*********************************************************************************/
+
+
+void setOsc(bool comp, bool dist, bool gate, bool stab){
+
+  OSCcomp = comp;
+  OSCdist = dist;
+  OSCgate = gate;
+  OSCstab = stab;
+  
+}
+
+void setPot(byte comp, byte dist, byte gate, byte stab){
+
+  compVal = comp;
+  distVal = dist;
+  gateVal = gate;
+  stabVal = stab;
+
+  setOsc(false,false,false,false);
+}
+
 
 /*********************************************************************************/
 /* MIDI - from jamjar drumkit ****************************************************/
@@ -74,7 +153,11 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 void HandleNoteOn(byte channel, byte note, byte velocity) {
   
   switch (note) {
-    case 24:
+    //case 24:
+    //  break;
+    default:
+      //This will revert to the 'velcro fuzz' setting - meaning any keyboard press can immediately fix any madness
+      setPot(120,10,100,100);
       break;
   }
 }
@@ -84,9 +167,21 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
 void HandleNoteOff(byte channel, byte note, byte velocity) {
   
   switch (note) {
-    case 24:
+    //case 24:
+    //  break;
+    //case 60:
+    //  break;
+    default:
       break;
   }
+}
+
+
+void setLFOfreq(Oscil <2048, CONTROL_RATE> * osc, bool * onflag, float multiplier, byte value){
+      //compSin.setFreq((float) 0.5 * value); 
+      osc->setFreq(multiplier * value);
+      *onflag = true;
+  
 }
 
 
@@ -94,31 +189,45 @@ void HandleControlChange (byte channel, byte number, byte value){
   switch (number){
     /***************************************************************/
     case 16:
-      compSin.setFreq((float) 0.5 * value);    
+      setLFOfreq(&compSin, &OSCcomp, 0.5, value);
       break;
 
     case 17:
-      compSin.setFreq((float) 0.05 * value);    
+      setLFOfreq(&compSin, &OSCcomp, 0.05, value);    
       break;
+
+    case 18:
+      if(value < 33) compSin.setTable(SIN2048_DATA);
+      else if(value < 65) compSin.setTable(SAW2048_DATA);
 
       
     /***************************************************************/
     case 32:
-      gateSin.setFreq((float) 0.5 * value);    
+      setLFOfreq(&distSin, &OSCdist, 0.5, value);  
       break;
       
     case 33:
-      gateSin.setFreq((float) 0.05 * value);    
+      setLFOfreq(&distSin, &OSCdist, 0.05, value);  
       break;
 
       
     /***************************************************************/
     case 48:
-      distSin.setFreq((float) 0.5 * value);    
+      setLFOfreq(&gateSin, &OSCgate, 0.5, value);  
       break;
       
     case 49:
-      distSin.setFreq((float) 0.05 * value);    
+      setLFOfreq(&gateSin, &OSCgate, 0.05, value);  
+      break;
+
+      
+    /***************************************************************/
+    case 64:
+      setLFOfreq(&stabSin, &OSCstab, 0.5, value);  
+      break;
+      
+    case 65:
+      setLFOfreq(&stabSin, &OSCstab, 0.05, value);  
       break;
 
     
@@ -126,16 +235,6 @@ void HandleControlChange (byte channel, byte number, byte value){
   
 }
 
-
-
-
-
-//TODO: we could #define these!
-byte cmd_byte1    = B00010010 ;            // Command byte
-byte cmd_byte0    = B00010001 ;            // Command byte
-byte cmd_byteboth = B00010011 ;            // Command byte
-
-int initial_value = 100;                // Setting up the initial value
 
 
 void initialize_spi(byte mosi, byte clk) {                     // send the command byte of value 100 (initial value)
@@ -167,6 +266,10 @@ void spi_transfer(byte working, byte mosi, byte clk) {
   }
 }
 
+
+
+
+
 void setup() {
   pinMode (aCS_signal, OUTPUT);
   pinMode (aCLK_signal, OUTPUT);
@@ -176,21 +279,14 @@ void setup() {
   pinMode (bCLK_signal, OUTPUT);
   pinMode (bMOSI_signal, OUTPUT);
 
-  pinMode (LED_comp, OUTPUT);
-  pinMode (LED_dist, OUTPUT);
-  pinMode (LED_gate, OUTPUT);
-  pinMode (LED_stab, OUTPUT);
+  pinMode (LED_COMP_PIN, OUTPUT);
+  pinMode (LED_DIST_PIN, OUTPUT);
+  pinMode (LED_GATE_PIN, OUTPUT);
+  pinMode (LED_STAB_PIN, OUTPUT);
 
   //TODO: Find good initial settings! - OR better still, send the midi control message for the default setting
+  //NB: This action is voided on the first call to updateControl...
   initialize_spi(aMOSI_signal,aCLK_signal);
-
-
-  /* Freq: 6.5 is twice the speed of 3.5 */
-  //use primes to init - get the range!
-  compSin.setFreq(0.001f);//1.0f/2.0f);//(0.42f);
-  distSin.setFreq(0.001f);//1.0f);//1.0f/3.0f);//(0.42f); //Doesn't seem to do anything!
-  gateSin.setFreq(0.001f);//5.0f);//(0.42f);                This is STAB!! led 3 (l-r)
-  stabSin.setFreq(4.001f);///7.0f);//(0.42f);             //This is comp
 
 
   // Initiate MIDI communications, listen to all channels
@@ -202,11 +298,17 @@ void setup() {
   MIDI.setHandleNoteOff(HandleNoteOff);  // Put only the name of the function
   MIDI.setHandleControlChange(HandleControlChange);
   
+
+
+  /* Freq: 6.5 is twice the speed of 3.5 */
+  //use primes to init - get the range!
+  compSin.setFreq(0.25f);//1.0f/2.0f);//(0.42f);         This is STAB!
+  distSin.setFreq(0.25f);//1.0f);//1.0f/3.0f);//(0.42f); 
+  gateSin.setFreq(14.25f);//5.0f);//(0.42f);               
+  stabSin.setFreq(0.25f);///7.0f);//(0.42f);             
+  
   startMozzi(CONTROL_RATE);
 }
-
-
-int compLFO,distLFO,gateLFO,stabLFO;
 
 void updateControl(){
 
@@ -215,28 +317,37 @@ void updateControl(){
 
   //TODO: The following should be in the MIDI control commands
   // compSin.next() returns a signed byte between -128 to 127 from the wave table
-  compLFO = 128 + (0.99 * compSin.next());
-  distLFO = 128 + (0.99 * distSin.next());
-  gateLFO = 128 + (0.99 * gateSin.next());
-  stabLFO = 128 + (0.99 * stabSin.next());
+  if(OSCcomp) compVal = 128 + (0.99 * compSin.next());
+  if(OSCdist) distVal = 128 + (0.99 * distSin.next());
+  if(OSCgate) gateVal = 128 + (0.99 * gateSin.next());
+  if(OSCstab) stabVal = 128 + (0.99 * stabSin.next());
 
 
-  //spi_out(CS_signal, cmd_byteboth, compLFO); 
-  spi_out(aCS_signal, cmd_byte0, compLFO,  aMOSI_signal, aCLK_signal); 
-  spi_out(aCS_signal, cmd_byte1, distLFO,  aMOSI_signal, aCLK_signal); 
-  spi_out(bCS_signal, cmd_byte0, gateLFO,  bMOSI_signal, bCLK_signal); 
-  spi_out(bCS_signal, cmd_byte1, stabLFO,  bMOSI_signal, bCLK_signal); 
+  //spi_out(CS_signal, cmd_byteboth, compVal); 
+  //FURTHEST from Arduino
+  //With Arduino to the LEFT, byte0 is on the bottom, byte1 is on the top (CHECK THIS)
+  spi_out(aCS_signal, cmd_byte0, stabVal,  aMOSI_signal, aCLK_signal); 
+  spi_out(aCS_signal, cmd_byte1, compVal,  aMOSI_signal, aCLK_signal); 
 
-  analogWrite(LED_comp, compLFO);
-  analogWrite(LED_dist, distLFO);
-  analogWrite(LED_gate, gateLFO);
-  analogWrite(LED_stab, stabLFO);
-  
+  //NEAREST to Arduino
+  spi_out(bCS_signal, cmd_byte0, gateVal,  bMOSI_signal, bCLK_signal); 
+  spi_out(bCS_signal, cmd_byte1, distVal,  bMOSI_signal, bCLK_signal); 
+
+  //analogWrite(LED_COMP_PIN, compVal);
+  //analogWrite(LED_DIST_PIN, distVal);
+  //analogWrite(LED_GATE_PIN, gateVal);
+  //analogWrite(LED_STAB_PIN, stabVal);
+  //void updateLED(byte PIN, byte r)
 }
 
 
 int updateAudio(){
- 
+
+  updateLED(LED_COMP_PIN, compVal);
+  updateLED(LED_DIST_PIN, distVal);
+  updateLED(LED_GATE_PIN, gateVal);
+  updateLED(LED_STAB_PIN, stabVal);
+  //updateLED(LED_STAB_PIN,stabVal);
   
   return 1;
 }

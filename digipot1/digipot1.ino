@@ -1,5 +1,4 @@
 
-
 /*********************************************************************************/
 /*  PIN DEFINITIONS  *************************************************************/
 /*********************************************************************************/
@@ -33,24 +32,27 @@ byte bMOSI_signal = A2;//4;                    // MOSI signal on pin 7 of Arduin
 //*Mozzi disables analogWrite() on pins 5 and 6 (Timer 0), 9 and 10 (Timer 1) in STANDARD mode. In HIFI mode, pins 3 and 11 (Timer 2) are also out. Pin numbers vary between boards.
 //PIN 9 DOESN'T SEEM TO WOIK!work
 //PIN 5 and 6 don't seem to 
-#define LED_COMP_PIN 4     //output flashing LED in time with the LFO rate for GATE pot
+#define LED_COMP_PIN 4      //output flashing LED in time with the LFO rate for GATE pot
 #define LED_DIST_PIN 3      //output flashing LED in time with the LFO rate for GATE pot
-#define LED_GATE_PIN 2//10     //output flashing LED in time with the LFO rate for GATE pot
-#define LED_STAB_PIN 6    // trying to bitbang this ..
+#define LED_GATE_PIN 6//10  //output flashing LED in time with the LFO rate for GATE pot
+#define LED_STAB_PIN 2      // trying to bitbang this ..
 
 
 /*********************************************************************************/
 /*  GLOBAL VARIABLES  ************************************************************/
 /*********************************************************************************/
 
-//LFO values
+//digipot values
 byte compVal,distVal,gateVal,stabVal;
 
-//Boolean to say whether we are oscillating or not
-bool  OSCcomp = true,
-      OSCdist = true,
-      OSCgate = true,
-      OSCstab = true;
+//'Central' values for oscillators: 
+byte compCnt,distCnt,gateCnt,stabCnt;
+
+//Magnitude of oscillation: 
+byte compMag, distMag, gateMag, stabMag;
+
+//Phase of oscillation:
+byte compPha, distPha, gatePha, stabPha;
 
 
 //TODO: we could #define these!
@@ -70,14 +72,16 @@ int initial_value = 100;                // Setting up the initial value
 #include <Oscil.h>
 #include <tables/sin2048_int8.h>
 #include <tables/saw2048_int8.h>
+#include <tables/square_no_alias_2048_int8.h>
+#include <tables/triangle2048_int8.h>
 
 #define CONTROL_RATE (128)
 
 //LFO oscillators: 
-Oscil <2048, CONTROL_RATE> compSin(SIN2048_DATA);
-Oscil <2048, CONTROL_RATE> gateSin(SIN2048_DATA);
-Oscil <2048, CONTROL_RATE> distSin(SIN2048_DATA);
-Oscil <2048, CONTROL_RATE> stabSin(SIN2048_DATA);
+Oscil <2048, CONTROL_RATE> compWav(SIN2048_DATA);
+Oscil <2048, CONTROL_RATE> gateWav(SIN2048_DATA);
+Oscil <2048, CONTROL_RATE> distWav(SIN2048_DATA);
+Oscil <2048, CONTROL_RATE> stabWav(SIN2048_DATA);
 
 /*********************************************************************************/
 /* LED brightness - using bitbanging *********************************************/
@@ -119,23 +123,15 @@ void updateLED(byte PIN, byte r){
 /*********************************************************************************/
 
 
-void setOsc(bool comp, bool dist, bool gate, bool stab){
 
-  OSCcomp = comp;
-  OSCdist = dist;
-  OSCgate = gate;
-  OSCstab = stab;
-  
-}
 
+/*Set pots to a fixed value*/
 void setPot(byte comp, byte dist, byte gate, byte stab){
 
-  compVal = comp;
-  distVal = dist;
-  gateVal = gate;
-  stabVal = stab;
-
-  setOsc(false,false,false,false);
+  compCnt = comp;
+  distCnt = dist;
+  gateCnt = gate;
+  stabCnt = stab;
 }
 
 
@@ -158,6 +154,8 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
     default:
       //This will revert to the 'velcro fuzz' setting - meaning any keyboard press can immediately fix any madness
       setPot(120,10,100,100);
+      //Turn of all oscillations
+      compMag = distMag = gateMag = stabMag = 0;
       break;
   }
 }
@@ -176,58 +174,157 @@ void HandleNoteOff(byte channel, byte note, byte velocity) {
   }
 }
 
+//REMEMBER! you'll need to set the magnitude as well!
+void setLFOfreq(Oscil <2048, CONTROL_RATE> * osc, float multiplier, byte value){
 
-void setLFOfreq(Oscil <2048, CONTROL_RATE> * osc, bool * onflag, float multiplier, byte value){
-      //compSin.setFreq((float) 0.5 * value); 
       osc->setFreq(multiplier * value);
-      *onflag = true;
-  
+    
 }
 
 
 void HandleControlChange (byte channel, byte number, byte value){
   switch (number){
     /***************************************************************/
+    /* TODO: RESET CONTROLS - put params back to sensible defaults */
+    case 10: //Reset Everything
+    case 11: //Reset comp
+
+
+
+    
+    /***************************************************************/
     case 16:
-      setLFOfreq(&compSin, &OSCcomp, 0.5, value);
+      setLFOfreq(&compWav, 0.5, value);
       break;
 
     case 17:
-      setLFOfreq(&compSin, &OSCcomp, 0.05, value);    
+      setLFOfreq(&compWav, 0.005, value);    
       break;
 
     case 18:
-      if(value < 33) compSin.setTable(SIN2048_DATA);
-      else if(value < 65) compSin.setTable(SAW2048_DATA);
+      if      (value < 32)  compWav.setTable(SIN2048_DATA);
+      else  if(value < 64)  compWav.setTable(SAW2048_DATA);  
+      else  if(value < 96)  compWav.setTable(SQUARE_NO_ALIAS_2048_DATA);  
+      else                  compWav.setTable(TRIANGLE2048_DATA);  
+      break;
+
+    case 19:
+      compMag = value;  
+      break;
+
+    case 20:
+      compCnt = value << 1;
+      break;
+
+    case 21: //PHASE - UNTESTED!
+      /* 2048 samples - so each midi value can be an increment of 16. Default value is therefore zero. 
+       *  
+       */
+      compPha = value;
+      compWav.setPhase(compPha << 4);
+      break;
 
       
     /***************************************************************/
     case 32:
-      setLFOfreq(&distSin, &OSCdist, 0.5, value);  
+      setLFOfreq(&distWav, 0.5, value);  
       break;
       
     case 33:
-      setLFOfreq(&distSin, &OSCdist, 0.05, value);  
+      setLFOfreq(&distWav, 0.005, value);  
       break;
+
+    case 34:
+      if      (value < 32)  distWav.setTable(SIN2048_DATA);
+      else  if(value < 64)  distWav.setTable(SAW2048_DATA);  
+      else  if(value < 96)  distWav.setTable(SQUARE_NO_ALIAS_2048_DATA);  
+      else                  distWav.setTable(TRIANGLE2048_DATA);  
+      break;
+
+    case 35:
+      distMag = value;  
+      break;
+
+    case 36:
+      distCnt = value << 1;
+      break;
+
+    case 37: //PHASE - UNTESTED!
+      /* 2048 samples - so each midi value can be an increment of 16. Default value is therefore zero. 
+       *  
+       */
+      distPha = value;
+      distWav.setPhase(distPha << 4);
+      break;
+
 
       
     /***************************************************************/
     case 48:
-      setLFOfreq(&gateSin, &OSCgate, 0.5, value);  
+      setLFOfreq(&gateWav, 0.5, value);  
       break;
       
     case 49:
-      setLFOfreq(&gateSin, &OSCgate, 0.05, value);  
+      setLFOfreq(&gateWav, 0.005, value);  
       break;
+
+    case 50:
+      if      (value < 32)  gateWav.setTable(SIN2048_DATA);
+      else  if(value < 64)  gateWav.setTable(SAW2048_DATA);  
+      else  if(value < 96)  gateWav.setTable(SQUARE_NO_ALIAS_2048_DATA);  
+      else                  gateWav.setTable(TRIANGLE2048_DATA);  
+      break;
+
+    case 51:
+      gateMag = value;  
+      break;
+
+    case 52:
+      gateCnt = value << 1;
+      break;
+
+    case 53: //PHASE - UNTESTED!
+      /* 2048 samples - so each midi value can be an increment of 16. Default value is therefore zero. 
+       *  
+       */
+      gatePha = value;
+      gateWav.setPhase(gatePha << 4);
+      break;
+
+
+
 
       
     /***************************************************************/
     case 64:
-      setLFOfreq(&stabSin, &OSCstab, 0.5, value);  
+      setLFOfreq(&stabWav, 0.5, value);  
       break;
       
     case 65:
-      setLFOfreq(&stabSin, &OSCstab, 0.05, value);  
+      setLFOfreq(&stabWav, 0.005, value);  
+      break;
+
+    case 66:
+      if      (value < 32)  stabWav.setTable(SIN2048_DATA);
+      else  if(value < 64)  stabWav.setTable(SAW2048_DATA);  
+      else  if(value < 96)  stabWav.setTable(SQUARE_NO_ALIAS_2048_DATA);  
+      else                  stabWav.setTable(TRIANGLE2048_DATA);  
+      break;
+
+    case 67:
+      stabMag = value;  
+      break;
+
+    case 68:
+      stabCnt = value << 1;
+      break;
+
+    case 69: //PHASE - UNTESTED!
+      /* 2048 samples - so each midi value can be an increment of 16. Default value is therefore zero. 
+       *  
+       */
+      stabPha = value;
+      stabWav.setPhase(stabPha << 4);
       break;
 
     
@@ -297,30 +394,46 @@ void setup() {
   MIDI.setHandleNoteOn(HandleNoteOn);  // Put only the name of the function
   MIDI.setHandleNoteOff(HandleNoteOff);  // Put only the name of the function
   MIDI.setHandleControlChange(HandleControlChange);
+
+
+
+  compCnt = distCnt = gateCnt = stabCnt = 128;
+
+  //Magnitude of oscillation as a fraction: 
+  compMag = distMag = gateMag = stabMag = 127;
   
 
 
   /* Freq: 6.5 is twice the speed of 3.5 */
   //use primes to init - get the range!
-  compSin.setFreq(0.25f);//1.0f/2.0f);//(0.42f);         This is STAB!
-  distSin.setFreq(0.25f);//1.0f);//1.0f/3.0f);//(0.42f); 
-  gateSin.setFreq(14.25f);//5.0f);//(0.42f);               
-  stabSin.setFreq(0.25f);///7.0f);//(0.42f);             
+  compWav.setFreq(2.0f);//5.25f);//1.0f/2.0f);//(0.42f);         This is STAB!
+  distWav.setFreq(2.0f);//0.25f);//1.0f);//1.0f/3.0f);//(0.42f); 
+  gateWav.setFreq(2.0f);//6.75f);//5.0f);//(0.42f);               
+  stabWav.setFreq(2.0f);//1.0f);///7.0f);//(0.42f);             
   
   startMozzi(CONTROL_RATE);
 }
 
 void updateControl(){
 
-
+  //Process any incoming MIDI: 
   MIDI.read();
 
-  //TODO: The following should be in the MIDI control commands
-  // compSin.next() returns a signed byte between -128 to 127 from the wave table
-  if(OSCcomp) compVal = 128 + (0.99 * compSin.next());
-  if(OSCdist) distVal = 128 + (0.99 * distSin.next());
-  if(OSCgate) gateVal = 128 + (0.99 * gateSin.next());
-  if(OSCstab) stabVal = 128 + (0.99 * stabSin.next());
+  stabMag = 24;
+  stabCnt = 50;
+  gateMag = 64;
+  gateCnt = 48;
+  compMag = 32;
+  compMag = 96;
+
+
+  //TODO: Rather than clumsily checking if we are oscillating or not, simple set xxxxMag to zero - processing time is slightly higher, but *guaranteed*, and code is easier to maintain - saves a variable too. 
+  //Iterate the oscillators: 
+  // compWav.next() returns a signed byte between -128 to 127 from the wave table
+  compVal = compCnt + ((compMag * compWav.next())>>7);
+  distVal = distCnt + ((distMag * distWav.next())>>7);
+  gateVal = gateCnt + ((gateMag * gateWav.next())>>7);
+  stabVal = stabCnt + ((stabMag * stabWav.next())>>7);
 
 
   //spi_out(CS_signal, cmd_byteboth, compVal); 

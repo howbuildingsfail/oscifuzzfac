@@ -2,7 +2,7 @@
 Arduino-controlled fuzz factory with MIDI controlled LFOs
 
 
-
+All spi trimmers are 10k - so we'll have slightly different settings to consider if you are copying settings from t'internet
 
 
 #Notes / Testing
@@ -28,6 +28,11 @@ Not sure how well this works yet, because it uses the mozzi `setStart` function 
 
 Tested with other pots to manual,  D=127, stab=gate=64. All works fine - good candidate for synthing!
 
-###Drive
+###Drive,Gate, Stab
+
+All work as notes above
 
 
+###noteon settings
+
+There are a couple of no

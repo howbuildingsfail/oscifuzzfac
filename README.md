@@ -5,11 +5,13 @@ Arduino-controlled fuzz factory with MIDI controlled LFOs
 All spi trimmers are 10k - so we'll have slightly different settings to consider if you are copying settings from t'internet
 
 
-#Notes / Testing
+#Notes / Testing / TODO
 
 ##Frequency
 
-There are two 'bands' of frequency at the moment - the range is massive, but difficult to control precisely - we'd like to get a relationship between frequency and bpm at some point
+There are two 'bands' of frequency at the moment - the range is massive, but difficult to control precisely - we'd like to get a relationship between frequency and bpm at some point. The range should be from (say) 90 to (say) 218 - probably by way of a lookup table. 
+
+We could possibly do this via a multiplier on the second frequency channel - so 65 is a scale of 1.. will take some thinking about
 
 ##Waveshape
 

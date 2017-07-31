@@ -406,8 +406,8 @@ void setup() {
 
   /* Freq: 6.5 is twice the speed of 3.5 */
   //use primes to init - get the range!
-  compWav.setFreq(2.0f);//5.25f);//1.0f/2.0f);//(0.42f);         This is STAB!
-  distWav.setFreq(2.0f);//0.25f);//1.0f);//1.0f/3.0f);//(0.42f); 
+  compWav.setFreq(2.0f);//5.25f);//1.0f/2.0f);//(0.42f);   
+  distWav.setFreq(0.0125f);//0.25f);//1.0f);//1.0f/3.0f);//(0.42f); 
   gateWav.setFreq(2.0f);//6.75f);//5.0f);//(0.42f);               
   stabWav.setFreq(2.0f);//1.0f);///7.0f);//(0.42f);             
   
@@ -419,12 +419,13 @@ void updateControl(){
   //Process any incoming MIDI: 
   MIDI.read();
 
-  stabMag = 24;
-  stabCnt = 50;
+  //NB These override the midi! but are useful for setting up / fixing in a hurry...
+  stabMag = 120;
+  stabCnt = 64;
   gateMag = 64;
   gateCnt = 48;
-  compMag = 32;
-  compMag = 96;
+  //compMag = 32;
+  //compMag = 96;
 
 
   //TODO: Rather than clumsily checking if we are oscillating or not, simple set xxxxMag to zero - processing time is slightly higher, but *guaranteed*, and code is easier to maintain - saves a variable too. 
@@ -451,6 +452,9 @@ void updateControl(){
   //analogWrite(LED_GATE_PIN, gateVal);
   //analogWrite(LED_STAB_PIN, stabVal);
   //void updateLED(byte PIN, byte r)
+
+
+  
 }
 
 

@@ -1,8 +1,23 @@
 
 /*********************************************************************************/
-/*  PIN DEFINITIONS  *************************************************************/
+/*  SPI              *************************************************************/
 /*********************************************************************************/
 
+#include "SPI.h"
+
+//We are going to use the dedicated SPI stuff in the arduino - not reinvent the wheel.
+// http://tronixstuff.com/2011/05/13/tutorial-arduino-and-the-spi-bus/
+
+//We'll need two SS pins - one for each chip
+//Using pins 7 & 8 for now as mozzi doesn't use them
+#define spi_ss_a 7
+#define spi_ss_b 8
+
+
+
+/*********************************************************************************/
+/*  PIN DEFINITIONS  *************************************************************/
+/*********************************************************************************/
 
 /* On Arduino we can usually use analogwrite on pins 3, 5, 6, 9, 10, and 11. 
 
@@ -14,22 +29,21 @@
  */
 
 
-
-
 //TODO: we could #define these!
 //This is the chip NEAREST TO the Arduino
 //NB We were having trouble with using the analog pins - not sure why
-byte aCS_signal   = 8;//A4;//5;//2;                      // Chip Select signal on pin 5 of Arduino
-byte aCLK_signal  = 12;//A5;//6;//4;                     // Clock signal on pin 6 of Arduino
-byte aMOSI_signal = 13;//A6;//7;//5;                    // MOSI signal on pin 7 of Arduino
+//byte aCS_signal   = 8;//A4;//5;//2;            // Chip Select signal on pin 5 of Arduino
+//byte aCLK_signal  = 12;//A5;//6;//4;           // Clock signal on pin 6 of Arduino
+//byte aMOSI_signal = 13;//A6;//7;//5;           // MOSI signal on pin 7 of Arduino
 
 //This is the chip FURTHEST FROM the Arduino
-byte bCS_signal   = A0;//2;                      // Chip Select signal on pin 5 of Arduino
-byte bCLK_signal  = A1;//3;                     // Clock signal on pin 6 of Arduino
-byte bMOSI_signal = A2;//4;                    // MOSI signal on pin 7 of Arduino
+//byte bCS_signal   = A0;//2;                      // Chip Select signal on pin 5 of Arduino
+//byte bCLK_signal  = A1;//3;                     // Clock signal on pin 6 of Arduino
+//byte bMOSI_signal = A2;//4;                    // MOSI signal on pin 7 of Arduino
 
 
-//*Mozzi disables analogWrite() on pins 5 and 6 (Timer 0), 9 and 10 (Timer 1) in STANDARD mode. In HIFI mode, pins 3 and 11 (Timer 2) are also out. Pin numbers vary between boards.
+//*Mozzi disables analogWrite() on pins 5 and 6 (Timer 0), 9 and 10 (Timer 1) in STANDARD_PLUS mode. 
+//In HIFI mode, pins 3 and 11 (Timer 2) are also out. Pin numbers vary between boards.
 //PIN 9 DOESN'T SEEM TO WOIK!work
 //PIN 5 and 6 don't seem to 
 #define LED_COMP_PIN 4      //output flashing LED in time with the LFO rate for GATE pot
@@ -367,10 +381,22 @@ void spi_transfer(byte working, byte mosi, byte clk) {
 */
 
 
+//TODO: This is the new version of the send command using SPI.h
+void spi_out(int CS, byte cmd_byte, byte data_byte){                        // we need this function to send command byte and data byte to the chip
+    
+    digitalWrite (CS, LOW);                                                 // to start the transmission, the chip select must be low
+    SPI.transfer(cmd_byte); // invio il COMMAND BYTE
+    //delay(2);
+    SPI.transfer(data_byte); // invio il DATA BYTE
+    //delay(2);
+    digitalWrite(CS, HIGH);                                                 // to stop the transmission, the chip select must be high
+}
+
 
 
 
 void setup() {
+  /*Old spi code: 
   pinMode (aCS_signal, OUTPUT);
   pinMode (aCLK_signal, OUTPUT);
   pinMode (aMOSI_signal, OUTPUT);
@@ -378,15 +404,23 @@ void setup() {
   pinMode (bCS_signal, OUTPUT);
   pinMode (bCLK_signal, OUTPUT);
   pinMode (bMOSI_signal, OUTPUT);
+  */
 
   pinMode (LED_COMP_PIN, OUTPUT);
   pinMode (LED_DIST_PIN, OUTPUT);
   pinMode (LED_GATE_PIN, OUTPUT);
   pinMode (LED_STAB_PIN, OUTPUT);
 
+  //SPI.h
+  pinMode (spi_ss_a,  OUTPUT);
+  pinMode (spi_ss_b,  OUTPUT);
+  SPI.begin();
+  //Most SPI chips are MSBfirst: https://www.arduino.cc/en/Reference/SPI
+  SPI.setBitOrder(MSBFIRST);
+
   //TODO: Find good initial settings! - OR better still, send the midi control message for the default setting
   //NB: This action is voided on the first call to updateControl...
-  initialize_spi(aMOSI_signal,aCLK_signal);
+  //initialize_spi(aMOSI_signal,aCLK_signal);
 
 
   // Initiate MIDI communications, listen to all channels
@@ -410,9 +444,9 @@ void setup() {
   /* Freq: 6.5 is twice the speed of 3.5 */
   //use primes to init - get the range!
   compWav.setFreq(2.0f);//5.25f);//1.0f/2.0f);//(0.42f);   
-  distWav.setFreq(0.0125f);//0.25f);//1.0f);//1.0f/3.0f);//(0.42f); 
-  gateWav.setFreq(2.0f);//6.75f);//5.0f);//(0.42f);               
-  stabWav.setFreq(2.0f);//1.0f);///7.0f);//(0.42f);             
+  distWav.setFreq(1.0f);(0.0125f);//0.25f);//1.0f);//1.0f/3.0f);//(0.42f); 
+  gateWav.setFreq(8.0f);//6.75f);//5.0f);//(0.42f);               
+  stabWav.setFreq(4.0f);//1.0f);///7.0f);//(0.42f);             
   
   startMozzi(CONTROL_RATE);
 }
@@ -423,10 +457,10 @@ void updateControl(){
   MIDI.read();
 
   //NB These override the midi! but are useful for setting up / fixing in a hurry...
-  stabMag = 120;
-  stabCnt = 64;
-  gateMag = 64;
-  gateCnt = 48;
+  //stabMag = 120;
+  //stabCnt = 64;
+  //gateMag = 64;
+  //gateCnt = 48;
   //compMag = 32;
   //compMag = 96;
 
@@ -443,12 +477,17 @@ void updateControl(){
   //spi_out(CS_signal, cmd_byteboth, compVal); 
   //FURTHEST from Arduino
   //With Arduino to the LEFT, byte0 is on the bottom, byte1 is on the top (CHECK THIS)
-  spi_out(aCS_signal, cmd_byte0, stabVal,  aMOSI_signal, aCLK_signal); 
-  spi_out(aCS_signal, cmd_byte1, compVal,  aMOSI_signal, aCLK_signal); 
+  //spi_out(aCS_signal, cmd_byte0, stabVal,  aMOSI_signal, aCLK_signal); 
+  //spi_out(aCS_signal, cmd_byte1, compVal,  aMOSI_signal, aCLK_signal); 
+  spi_out(spi_ss_a,  cmd_byte0, stabVal);
+  spi_out(spi_ss_a,  cmd_byte1, compVal);
+
 
   //NEAREST to Arduino
-  spi_out(bCS_signal, cmd_byte0, gateVal,  bMOSI_signal, bCLK_signal); 
-  spi_out(bCS_signal, cmd_byte1, distVal,  bMOSI_signal, bCLK_signal); 
+  //spi_out(bCS_signal, cmd_byte0, gateVal,  bMOSI_signal, bCLK_signal); 
+  //spi_out(bCS_signal, cmd_byte1, distVal,  bMOSI_signal, bCLK_signal); 
+  spi_out(spi_ss_b,  cmd_byte0, gateVal);
+  spi_out(spi_ss_b,  cmd_byte1, distVal);
 
   //analogWrite(LED_COMP_PIN, compVal);
   //analogWrite(LED_DIST_PIN, distVal);
@@ -461,13 +500,13 @@ void updateControl(){
 }
 
 
+//TODO - we shouldn't have to update LEDs this often - figure out how to do this...
 int updateAudio(){
 
   updateLED(LED_COMP_PIN, compVal);
   updateLED(LED_DIST_PIN, distVal);
   updateLED(LED_GATE_PIN, gateVal);
   updateLED(LED_STAB_PIN, stabVal);
-  //updateLED(LED_STAB_PIN,stabVal);
   
   return 1;
 }

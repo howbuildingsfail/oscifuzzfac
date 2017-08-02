@@ -332,7 +332,9 @@ void HandleControlChange (byte channel, byte number, byte value){
   
 }
 
-
+/*
+//spi from this, but it doesn't use spi library!!
+//https://github.com/rickit69/techrm/blob/master/test_potenziometro_digitale_1/test_potenziometro_digitale_1.ino
 
 void initialize_spi(byte mosi, byte clk) {                     // send the command byte of value 100 (initial value)
     //TODO: need to initialise all four pots - 
@@ -362,6 +364,7 @@ void spi_transfer(byte working, byte mosi, byte clk) {
     digitalWrite(clk,LOW) ;                                          // Pulse the CLK_signal low
   }
 }
+*/
 
 
 

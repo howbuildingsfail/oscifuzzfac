@@ -38,3 +38,38 @@ All work as notes above
 ###noteon settings
 
 There are a couple of no
+
+
+
+# MIDI Table
+
+## MIDI Control Changes
+
+
+| Channel No | Knob | Effect |
+| --- | :--- | :-- |
+|  16 | Comp | Coarse LFO freq change |
+|  17 |      | Fine Comp LFO freq change |
+|  18 |      | Select Comp wavetable (Sin(0-32),Tri(33-63),Saw(64-95),Squ(96-127) |
+|  19 |      | LFO sweep size |
+|  20 |      | LFO sweep centre |
+|  21 |      | LFO phase |
+| --- | :--- | :-- |
+|  32 | Dist | Coarse LFO freq change |
+|  33 |      | Fine Comp LFO freq change |
+|  34 |      | Select Comp wavetable (Sin(0-32),Tri(33-63),Saw(64-95),Squ(96-127) |
+|  35 |      | LFO sweep size |
+|  36 |      | LFO sweep centre |
+|  37 |      | LFO phase |
+| --- | :--- | :-- |
+|  48 | Gate | Coarse LFO freq change |
+|  49 |      | Fine Comp LFO freq change |
+|  50 |      | Select Comp wavetable (Sin(0-32),Tri(33-63),Saw(64-95),Squ(96-127) |
+|  51 |      | LFO sweep size |
+|  52 |      | LFO sweep centre |
+|  53 |      | LFO phase |
+
+
+
+
+

@@ -1,8 +1,22 @@
-# oscifuzzfac
+# Oscifuzzfac
+
 Arduino-controlled fuzz factory with MIDI controlled LFOs
 
-
 All spi trimmers are 10k - so we'll have slightly different settings to consider if you are copying settings from t'internet
+
+
+# Programs
+
+## Digipot1
+
+*see folder digipot1*
+
+This is a midi controller for *all* controls on the fuzz factory: Drive, Comp, Stab and Gate. 
+
+The hardware consisted of a set of switches to choose between potentiometer and arduino control for the four pots.
+
+Unfortunately, the Stab controller seemed to introduce interference into the signal path, and the Drive controller seemed to do less interesting things compared with the Gate and Comp pots. 
+
 
 
 # Notes / Testing / TODO

@@ -30,10 +30,16 @@
 //We are going to use the dedicated SPI stuff in the arduino - not reinvent the wheel.
 // http://tronixstuff.com/2011/05/13/tutorial-arduino-and-the-spi-bus/
 
-//We'll need two SS pins - one for each chip
-//Using pins 7 & 8 for now as mozzi doesn't use them
+//We'll need an SS pin
+//Using pin 7 as mozzi doesn't use them
 #define SPI_SS_A 7
-#define SPI_SS_B 8
+
+#define POT_PIN_1 A1
+#define POT_PIN_2 A2
+#define POT_PIN_3 A3
+
+
+//#define SPI_SS_B 8
 
 /*********************************************************************************/
 /*  PIN DEFINITIONS  *************************************************************/
@@ -64,16 +70,16 @@
 /*********************************************************************************/
 
 //digipot values
-byte compVal,distVal,gateVal,stabVal;
+byte compVal,gateVal;
 
 //'Central' values for oscillators: 
-byte compCnt,distCnt,gateCnt,stabCnt;
+byte compCnt,gateCnt;
 
 //Magnitude of oscillation: 
-byte compMag, distMag, gateMag, stabMag;
+byte compMag, gateMag;
 
 //Phase of oscillation:
-byte compPha, distPha, gatePha, stabPha;
+byte compPha, gatePha;
 
 
 //TODO: we could #define these!
@@ -99,8 +105,6 @@ byte cmd_byteboth = B00010011 ;            // Command byte
 //LFO oscillators: 
 Oscil <2048, CONTROL_RATE> compWav(SIN2048_DATA);
 Oscil <2048, CONTROL_RATE> gateWav(SIN2048_DATA);
-Oscil <2048, CONTROL_RATE> distWav(SIN2048_DATA);
-Oscil <2048, CONTROL_RATE> stabWav(SIN2048_DATA);
 
 /*********************************************************************************/
 /* LED brightness - using bitbanging *********************************************/
@@ -144,9 +148,7 @@ void updateLED(byte PIN, byte r){
 void setPots(byte comp, byte dist, byte gate, byte stab){
 
   compCnt = comp;
-  distCnt = dist;
   gateCnt = gate;
-  stabCnt = stab;
 }
 
 
@@ -171,7 +173,7 @@ void HandleNoteOn(byte channel, byte note, byte velocity) {
       //This will revert to the 'velcro fuzz' setting - meaning any keyboard press can immediately fix any madness
       setPots(120,10,100,100);
       //Turn of all oscillations
-      compMag = distMag = gateMag = stabMag = 0;
+      compMag = gateMag = 0;
       break;
   }
 }
@@ -206,6 +208,7 @@ void setLFOfreq(Oscil <2048, CONTROL_RATE> * osc, float multiplier, byte value){
 
 #define LFO_M (0.001165)
 #define LFO_C (0.02)
+
 //REMEMBER! you'll need to set the magnitude as well!
 //TODO: Find a good frequency sweep - might need a log or a pow or something
 //might be quicker to split the rate - have a steeper gradient above 64
@@ -214,34 +217,26 @@ void setLFOfreq_2(Oscil <2048, CONTROL_RATE> * osc,  byte value){
 
       const byte vml = value-1;
 
-
       osc->setFreq((float) ((LFO_M * vml *vml) + LFO_C));
     
 }
 
 
 
-
-
 #define BIG_FREQ_STEP (0.4)
 #define SML_FREQ_STEP (0.005)
-void HandleControlChange (byte channel, byte number, byte value){
 
+void HandleControlChange (byte channel, byte number, byte value){
 
 #ifdef MIDI_ECHO
   MIDI.sendControlChange(channel,number,value);
 #endif
-
-
   
   switch (number){
     /***************************************************************/
     /* TODO: RESET CONTROLS - put params back to sensible defaults */
     case 10: //Reset Everything
     case 11: //Reset comp
-
-
-
     
     /***************************************************************/
     case 16:
@@ -277,40 +272,6 @@ void HandleControlChange (byte channel, byte number, byte value){
       break;
 
       
-    /***************************************************************/
-    case 32:
-      //setLFOfreq(&distWav, BIG_FREQ_STEP, value);
-      setLFOfreq_2(&distWav, value);  
-      break;
-      
-    case 33:
-      setLFOfreq(&distWav, 0.005, value);  
-      break;
-
-    case 34:
-      if      (value < 32)  distWav.setTable(SIN2048_DATA);
-      else  if(value < 64)  distWav.setTable(TRIANGLE2048_DATA);  
-      else  if(value < 96)  distWav.setTable(SAW2048_DATA); 
-      else                  distWav.setTable(SQUARE_NO_ALIAS_2048_DATA); 
-      break;
-
-    case 35:
-      distMag = value;  
-      break;
-
-    case 36:
-      distCnt = value << 1;
-      break;
-
-    case 37: //PHASE - UNTESTED!
-      /* 2048 samples - so each midi value can be an increment of 16. Default value is therefore zero. 
-       *  
-       */
-      distPha = value;
-      distWav.setPhase(distPha << 4);
-      break;
-
-
       
     /***************************************************************/
     case 48:
@@ -345,51 +306,16 @@ void HandleControlChange (byte channel, byte number, byte value){
       gateWav.setPhase(gatePha << 4);
       break;
 
-
-
-
-      
-    /***************************************************************/
-    case 64:
-      //setLFOfreq(&stabWav, BIG_FREQ_STEP, value);  
-      setLFOfreq_2(&stabWav, value);
-      break;
-      
-    case 65:
-      setLFOfreq(&stabWav, 0.005, value);  
-      break;
-
-    case 66:
-      if      (value < 32)  stabWav.setTable(SIN2048_DATA);
-      else  if(value < 64)  stabWav.setTable(TRIANGLE2048_DATA);  
-      else  if(value < 96)  stabWav.setTable(SAW2048_DATA);  
-      else                  stabWav.setTable(SQUARE_NO_ALIAS_2048_DATA);  
-      break;
-
-    case 67:
-      stabMag = value;  
-      break;
-
-    case 68:
-      stabCnt = value << 1;
-      break;
-
-    case 69: //PHASE - UNTESTED!
-      /* 2048 samples - so each midi value can be an increment of 16. Default value is therefore zero. 
-       *  
-       */
-      stabPha = value;
-      stabWav.setPhase(stabPha << 4);
-      break;
-
   }  
 }
+
+
+
 
 /*
 //spi method was derived from this, but it doesn't use spi library!!
 //https://github.com/rickit69/techrm/blob/master/test_potenziometro_digitale_1/test_potenziometro_digitale_1.ino
 */
-
 
 //TODO: This is the new version of the send command using SPI.h
 void spi_out(int CS, byte cmd_byte, byte data_byte){                        // we need this function to send command byte and data byte to the chip
@@ -416,15 +342,15 @@ void setup() {
 
   //SPI.h
   pinMode (SPI_SS_A,  OUTPUT);
-  pinMode (SPI_SS_B,  OUTPUT);
+
+  //Pot pins
+  pinMode(POT_PIN_1, INPUT); 
+  pinMode(POT_PIN_2, INPUT); 
+  pinMode(POT_PIN_3, INPUT); 
+
   SPI.begin();
   //Most SPI chips are MSBfirst: https://www.arduino.cc/en/Reference/SPI
   SPI.setBitOrder(MSBFIRST);
-
-  //TODO: Find good initial settings! - OR better still, send the midi control message for the default setting
-  //NB: This action is voided on the first call to updateControl...
-  //initialize_spi(aMOSI_signal,aCLK_signal);
-
 
   // Initiate MIDI communications, listen to all channels
   MIDI.begin(13);
@@ -443,73 +369,93 @@ void setup() {
 
 
   //Centre of oscillation
-  compCnt = distCnt = gateCnt = stabCnt = 128;
+  compCnt = gateCnt = 128;
 
   //Magnitude of oscillation 
-  compMag = distMag = gateMag = stabMag = 127;
+  compMag = gateMag = 127;
   
-
-
   /* Freq: 6.5 is twice the speed of 3.25 */
   compWav.setFreq(2.0f);  //5.25f);//1.0f/2.0f);//(0.42f);   
-  distWav.setFreq(1.0f);  //(0.0125f);//0.25f);//1.0f);//1.0f/3.0f);//(0.42f); 
-  gateWav.setFreq(8.0f);  //6.75f);//5.0f);//(0.42f);               
-  stabWav.setFreq(4.0f);  //1.0f);///7.0f);//(0.42f);             
+  gateWav.setFreq(8.0f);  //6.75f);//5.0f);//(0.42f);    
   
   startMozzi(CONTROL_RATE);
 }
+
+
+int potval1,potval2,potval3;
+int lastpotval1=127,lastpotval2=127, lastpotval3=127;
 
 void updateControl(){
 
   //Process any incoming MIDI: 
   MIDI.read();
 
-  //NB These override the midi! but are useful for setting up / fixing in a hurry...
-  //stabMag = 120;
-  //stabCnt = 64;
-  //gateMag = 64;
-  //gateCnt = 48;
-  //compMag = 32;
-  //compMag = 96;
+
+  //Process pot1
+  potval1 = analogRead(POT_PIN_1);          //Read and save analog value from potentiometer
+  potval1 = map(potval1, 0, 1023, 0, 127);
+
+  if(potval1 != lastpotval1){
+    
+      compCnt = potval1;
+      gateCnt = potval1;
+
+      lastpotval1 = potval1;
+  }
 
 
-  //TODO: Rather than clumsily checking if we are oscillating or not, simply set xxxxMag to zero - processing time is slightly higher, but *guaranteed*, and code is easier to maintain - saves a variable too. 
+  //Process pot2
+  potval2 = analogRead(POT_PIN_2);          //Read and save analog value from potentiometer
+  potval2 = map(potval2, 0, 1023, 0, 127);
+
+  if(potval2 != lastpotval2){
+    
+      compMag = potval2;
+      gateMag = potval2;
+
+      lastpotval2 = potval2;
+  }
+
+
+  //Process pot3
+  potval3 = analogRead(POT_PIN_3);          //Read and save analog value from potentiometer
+  potval3 = map(potval3, 0, 1023, 0, 127);
+
+  if(potval3 != lastpotval3){
+    
+      setLFOfreq_2(&compWav, potval3);  
+      setLFOfreq_2(&gateWav, potval3+10);  
+
+      lastpotval3 = potval3;
+  }
   
+  
+
   
   //Iterate the oscillators: 
   // compWav.next() returns a signed byte between -128 to 127 from the wave table
   compVal = compCnt + ((compMag * compWav.next())>>7);
-  distVal = distCnt + ((distMag * distWav.next())>>7);
   gateVal = gateCnt + ((gateMag * gateWav.next())>>7);
-  stabVal = stabCnt + ((stabMag * stabWav.next())>>7);
 
 
-  //spi_out(CS_signal, cmd_byteboth, compVal); 
-  //FURTHEST from Arduino
-  //With Arduino to the LEFT, byte0 is on the bottom, byte1 is on the top (CHECK THIS)
-  //spi_out(aCS_signal, cmd_byte0, stabVal,  aMOSI_signal, aCLK_signal); 
-  //spi_out(aCS_signal, cmd_byte1, compVal,  aMOSI_signal, aCLK_signal); 
-  spi_out(SPI_SS_A,  cmd_byte0, stabVal);
-  spi_out(SPI_SS_A,  cmd_byte1, compVal);
+  //spi_out(CS_signal, cmd_byteboth, compVal);  
+  spi_out(SPI_SS_A,  cmd_byte0, gateVal);
+  spi_out(SPI_SS_A,  cmd_byte1, compVal); 
+
+  //pot pin
 
 
-  //NEAREST to Arduino
-  //spi_out(bCS_signal, cmd_byte0, gateVal,  bMOSI_signal, bCLK_signal); 
-  //spi_out(bCS_signal, cmd_byte1, distVal,  bMOSI_signal, bCLK_signal); 
-  spi_out(SPI_SS_B,  cmd_byte0, gateVal);
-  spi_out(SPI_SS_B,  cmd_byte1, distVal);
-
-  //TODO: periodically send MIDI state (for touchosc)  
+  
 }
 
 
 //TODO - we shouldn't have to update LEDs this often - figure out how to do this...
 int updateAudio(){
 
-  updateLED(LED_COMP_PIN, compVal);
-  updateLED(LED_DIST_PIN, distVal);
-  updateLED(LED_GATE_PIN, gateVal);
-  updateLED(LED_STAB_PIN, stabVal);
+  updateLED(LED_DIST_PIN, (compVal+gateVal)>>2);
+  updateLED(LED_COMP_PIN, lastpotval1);
+  updateLED(LED_STAB_PIN, lastpotval2);
+  updateLED(LED_GATE_PIN, lastpotval3);
   
   return 1;
 }

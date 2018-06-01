@@ -391,7 +391,7 @@ void updateControl(){
   MIDI.read();
 
 
-  //Process pot1
+  //Process pot1 - LFO Centre
   potval1 = analogRead(POT_PIN_1);          //Read and save analog value from potentiometer
   potval1 = map(potval1, 0, 1023, 0, 127);
 
@@ -404,7 +404,7 @@ void updateControl(){
   }
 
 
-  //Process pot2
+  //Process pot2 - LFO Magnitude
   potval2 = analogRead(POT_PIN_2);          //Read and save analog value from potentiometer
   potval2 = map(potval2, 0, 1023, 0, 127);
 
@@ -417,7 +417,7 @@ void updateControl(){
   }
 
 
-  //Process pot3
+  //Process pot3 - LFO Frequency
   potval3 = analogRead(POT_PIN_3);          //Read and save analog value from potentiometer
   potval3 = map(potval3, 0, 1023, 0, 127);
 
@@ -432,8 +432,21 @@ void updateControl(){
   
 
   
-  //Iterate the oscillators: 
-  // compWav.next() returns a signed byte between -128 to 127 from the wave table
+  /*Iterate the oscillators: 
+    - compWav.next() returns a signed byte between -128 to 127 from the wave table
+    - compMag is the magnitude - from 0 to 127
+    - the >>7 operation puts this in the range -64 to 64
+    
+    - TODO: we need to make sure that the wave doesn't go out of the range of values in a byte or
+      we'll get weird effects - although these can be quite interesting, its a bit too unpredicatble
+      in a live setting as it becomes difficult to hear where the centre of the LFO range is  
+  */  
+  
+  if( (compMag>>1) > compCnt){//if the magnitude is going to sweep the wave below 0
+    
+  }
+  
+  
   compVal = compCnt + ((compMag * compWav.next())>>7);
   gateVal = gateCnt + ((gateMag * gateWav.next())>>7);
 

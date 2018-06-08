@@ -65,6 +65,9 @@
 #define LED_STAB_PIN 2      //output flashing LED in time with the LFO rate for STAB pot
 
 
+#define MAG_CNT_PROP  0.015625  // = 1/64  - used to calculate max oscillation given a centre
+
+
 /*********************************************************************************/
 /*  GLOBAL VARIABLES  ************************************************************/
 /*********************************************************************************/
@@ -74,6 +77,7 @@ byte compVal,gateVal;
 
 //'Central' values for oscillators: 
 byte compCnt,gateCnt;
+float compCMprop, gateCMprop;
 
 //Magnitude of oscillation: 
 byte compMag, gateMag;
@@ -368,9 +372,11 @@ void setup() {
   MIDI.setHandleControlChange(HandleControlChange);
 
 
-  //Centre of oscillation
-  compCnt = gateCnt = 128;
+  //Centre of oscillation and m
+  compCnt = gateCnt = 64;
 
+  compCMprop = gateCMprop = 1;
+  
   //Magnitude of oscillation 
   compMag = gateMag = 127;
   
@@ -384,6 +390,7 @@ void setup() {
 
 int potval1,potval2,potval3;
 int lastpotval1=127,lastpotval2=127, lastpotval3=127;
+
 
 void updateControl(){
 
@@ -401,6 +408,10 @@ void updateControl(){
       gateCnt = potval1;
 
       lastpotval1 = potval1;
+
+      //Update the maximum proportion that lag can be: 
+      compCMprop =  gateCMprop = MAG_CNT_PROP * min(compCnt,(127-compCnt));
+      
   }
 
 
@@ -413,7 +424,7 @@ void updateControl(){
       compMag = potval2;
       gateMag = potval2;
 
-      lastpotval2 = potval2;
+      lastpotval2 = potval2;      
   }
 
 
@@ -436,19 +447,12 @@ void updateControl(){
     - compWav.next() returns a signed byte between -128 to 127 from the wave table
     - compMag is the magnitude - from 0 to 127
     - the >>7 operation puts this in the range -64 to 64
-    
-    - TODO: we need to make sure that the wave doesn't go out of the range of values in a byte or
-      we'll get weird effects - although these can be quite interesting, its a bit too unpredicatble
-      in a live setting as it becomes difficult to hear where the centre of the LFO range is  
+    - compCMprop scales the mag to fit within the range 0 to 127 - the wave will be v. small at extreme values
   */  
   
-  if( (compMag>>1) > compCnt){//if the magnitude is going to sweep the wave below 0
-    
-  }
   
-  
-  compVal = compCnt + ((compMag * compWav.next())>>7);
-  gateVal = gateCnt + ((gateMag * gateWav.next())>>7);
+  compVal = compCnt + (compCMprop *(( compMag * compWav.next())>>7) );
+  gateVal = gateCnt + (gateCMprop *(( gateMag * gateWav.next())>>7) );
 
 
   //spi_out(CS_signal, cmd_byteboth, compVal);  

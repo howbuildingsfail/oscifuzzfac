@@ -58,10 +58,11 @@
 //In HIFI mode, pins 3 and 11 (Timer 2) are also out. Pin numbers vary between boards.
 //PIN 9 DOESN'T SEEM TO WOIK!work
 //PIN 5 and 6 don't seem to 
+
 #define LED_COMP_PIN 4      //output flashing LED in time with the LFO rate for COMP pot
 #define LED_DIST_PIN 3      //output flashing LED in time with the LFO rate for DIST pot
 
-#define LED_GATE_PIN 6      //output flashing LED in time with the LFO rate for GATE pot
+#define LED_GATE_PIN 5//6      //output flashing LED in time with the LFO rate for GATE pot
 #define LED_STAB_PIN 2      //output flashing LED in time with the LFO rate for STAB pot
 
 
@@ -335,6 +336,9 @@ void spi_out(int CS, byte cmd_byte, byte data_byte){                        // w
 
 
 
+
+
+
 void setup() {
 
   pinMode (LED_COMP_PIN, OUTPUT);
@@ -391,6 +395,14 @@ void setup() {
 int potval1,potval2,potval3;
 int lastpotval1=127,lastpotval2=127, lastpotval3=127;
 
+int updatePot(byte pin,int *target){
+  int val = analogRead(pin);          //Read and save analog value from potentiometer
+  val = map(val, 0, 1023, 0, 127);
+
+  
+}
+
+
 
 void updateControl(){
 
@@ -398,6 +410,9 @@ void updateControl(){
   MIDI.read();
 
 
+
+
+#ifdef LFO_CENTRE_POT
   //Process pot1 - LFO Centre
   potval1 = analogRead(POT_PIN_1);          //Read and save analog value from potentiometer
   potval1 = map(potval1, 0, 1023, 0, 127);
@@ -439,7 +454,35 @@ void updateControl(){
 
       lastpotval3 = potval3;
   }
-  
+#else
+  //Process pot1 - LFO Mag
+  potval1 = analogRead(POT_PIN_1);          //Read and save analog value from potentiometer
+  potval1 = map(potval1, 0, 1023, 0, 127);
+  if(potval1 != lastpotval1){
+      compMag = potval1;
+      gateMag = potval1;
+      lastpotval1 = potval1;      
+  }
+
+  //Process pot2 - Comp LFO Magnitude
+  potval2 = analogRead(POT_PIN_2);          //Read and save analog value from potentiometer
+  potval2 = map(potval2, 0, 1023, 0, 127);
+  if(potval2 != lastpotval2){
+      setLFOfreq_2(&compWav, potval2);  
+      lastpotval2 = potval2;      
+  }
+
+
+
+  //Process pot3 - Gate LFO Frequency
+  potval3 = analogRead(POT_PIN_3);          //Read and save analog value from potentiometer
+  potval3 = map(potval3, 0, 1023, 0, 127);
+
+  if(potval3 != lastpotval3){
+      setLFOfreq_2(&gateWav, potval3);  
+      lastpotval3 = potval3;
+  }
+#endif 
   
 
   
@@ -466,10 +509,12 @@ void updateControl(){
 }
 
 
+//BIG TODO: THE updateLED function seems to have an effect on the audio - particularly if we have 4 of them...
 //TODO - we shouldn't have to update LEDs this often - figure out how to do this...
 int updateAudio(){
 
   updateLED(LED_DIST_PIN, (compVal+gateVal)>>2);
+  //updateLED(LED_DIST_PIN, lastpotval1);
   updateLED(LED_COMP_PIN, lastpotval1);
   updateLED(LED_STAB_PIN, lastpotval2);
   updateLED(LED_GATE_PIN, lastpotval3);
